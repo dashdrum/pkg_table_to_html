@@ -53,7 +53,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_TABLE_TO_HTML AS
       END IF;
 
       IF v_separator IS NULL THEN
-        clob_Data := clob_Data || ' ' || HTF.TABLEDATA(clob_Temp, 'CENTER');
+        clob_Data := clob_Data || ' ' || HTF.TABLEDATA(clob_Temp, NULL,NULL,NULL,NULL,NULL, 'class="' || descTabRec(i_Count).col_name || '"');
       ELSE
         clob_Data := clob_Data || nvl(clob_Temp,'undefined') || v_separator;
       END IF;
@@ -98,27 +98,38 @@ CREATE OR REPLACE PACKAGE BODY PKG_TABLE_TO_HTML AS
     i_Count     INTEGER;
     clob_Html   CLOB;
     clob_Temp   CLOB;
+    row_count   INTEGER := 0;
    BEGIN
     DBMS_SQL.DESCRIBE_COLUMNS(i_CurNum, i_ColCount, descTabRec);
 
     clob_Html := clob_HtmlStart;
 
-    -- set title of html
-    clob_Html := clob_Html || HTF.TITLE(TO_CHAR(SYSDATE, 'DD/MM/YYYY HH24:MI:SS')) || CHR(10);
-    -- add custom message to header
-    clob_Html := clob_Html || HTF.HEADER(3, TO_CHAR(clob_Message), 'CENTER') || CHR(10);
     -- open table
-    clob_Html := clob_Html || HTF.TABLEOPEN('BORDER=1', 'CENTER', NULL, NULL, 'CELLPADDING=0') || CHR(10);
+    clob_Html := clob_Html || HTF.TABLEOPEN(NULL, NULL, NULL, NULL, NULL ) || CHR(10);
+
+    -- set table caption
+    clob_Html := clob_Html || HTF.TABLECAPTION(clob_Message) || CHR(10);
+
+    -- OPEN THEAD
+    clob_Html := clob_Html || '<thead>' || CHR(10);
 
     -- new row for table header
     clob_Html := clob_Html || HTF.TABLEROWOPEN || CHR(10);
     -- loop all columns and set table headers
     FOR i_Count IN descTabRec.first .. i_ColCount
     LOOP
-      clob_Html := clob_Html || HTF.TABLEDATA(HTF.STRONG(descTabRec(i_Count).col_name), 'CENTER') || CHR(10);
+      clob_Html := clob_Html ||
+        HTF.TABLEHEADER(descTabRec(i_Count).col_name, NULL, NULL, NULL, NULL, NULL, 'class="' || descTabRec(i_Count).col_name || '"' )
+        || CHR(10);
     END LOOP;
     -- close row for table header
     clob_Html := clob_Html || HTF.TABLEROWCLOSE || CHR(10);
+
+    -- CLOSE THEAD
+    clob_Html := clob_Html || '</thead>' || CHR(10);
+
+    -- OPEN TBODY
+    clob_Html := clob_Html || '<tbody>' || CHR(10);
 
     -- fetch all rows in the table and prepare table
     LOOP
@@ -127,7 +138,22 @@ CREATE OR REPLACE PACKAGE BODY PKG_TABLE_TO_HTML AS
       clob_Html := clob_Html || HTF.TABLEROWOPEN || CHR(10);
       clob_Temp := CONCATENATE_ROW(i_CurNum, NULL);
       clob_Html := clob_Html || clob_Temp || HTF.TABLEROWCLOSE || CHR(10);
+      row_count := row_count + 1;
     END LOOP;
+
+    -- CLOSE TBODY
+    clob_Html := clob_Html || '</tbody>' || CHR(10);
+
+    -- OPEN TFOOT
+    clob_Html := clob_Html || '<tfoot>' || CHR(10);
+    
+      clob_Html := clob_Html || HTF.TABLEROWOPEN || CHR(10);
+      clob_Html := clob_Html || HTF.TABLEDATA(to_char(row_count) || ' Rows Selected',NULL,NULL,NULL,NULL,i_ColCount,NULL);
+      clob_Html := clob_Html || HTF.TABLEROWCLOSE || CHR(10);
+
+    -- CLOSE TFOOT
+    clob_Html := clob_Html || '</tfoot>' || CHR(10);
+    
     -- close table
     clob_Html := clob_Html || HTF.TABLECLOSE;
 
@@ -156,7 +182,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_TABLE_TO_HTML AS
 
     i_CurNum := DBMS_SQL.to_cursor_number(curObj);
     DEFINE_COLUMNS(i_CurNum);
-    clob_Data := CREATE_HTML(clob_Message, i_CurNum, '<html><body>', '</body></html>');
+    clob_Data := CREATE_HTML(clob_Message, i_CurNum, '', '');
 
     RETURN clob_Data;
   END;
